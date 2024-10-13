@@ -25,5 +25,5 @@ arc-swap = "1.6.0"
 regex = "1.10.2"
 lazy_static = "1.4.0"
 rust_decimal =  { version = "1.33.1", features = ["db-tokio-postgres"] }
-utoipa = { features = ["axum_extras"], version = "4.1.0" }
+utoipa = { features = ["axum_extras"], version = "4.2.3" }
 utoipa-swagger-ui = { features = ["axum"], version = "7.1.0" }
