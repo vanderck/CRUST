@@ -1,0 +1,18 @@
+{
+	"changes" : {
+      	"user": "kris", 
+	  	"password": "",
+	  	"host": "localhost",
+	  	"server": "core",
+	  	"schema": "changes",
+	  	"table": "pending"
+	},
+	"schemas" : [
+  		{
+      		"user": "kris", 
+	  		"password": "",
+	  		"host": "localhost",
+	  		"server": "core"
+	  	}
+	]
+}
