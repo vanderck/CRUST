@@ -7,7 +7,7 @@ edition = "2021"
 
 [[bin]]
 name = "CRUST"
-path = "src/mail.rs"
+path = "src/main.rs"
 
 
 [dependencies]
