@@ -873,7 +873,7 @@ async fn main() -> core::result::Result<(), Box<dyn std::error::Error>> {
         .route("/delete", post(delete))
         .route("/read", post(read))
         .route("/update", post(update))
-        .merge(SwaggerUi::new("/swagger-ui"))
+	.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api.clone()))
         .with_state(Arc::new(helper));
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);
