@@ -11,20 +11,21 @@ path = "src/main.rs"
 
 
 [dependencies]
-axum = "0.7.7"
-tokio = { version = "1.40", features = ["full"] }
-tracing = "0.1.40"
-tracing-subscriber = "0.3.18"
-serde = { version = "1.0.210", features = ["derive"] }
-deadpool-postgres = "0.14.0"
-tokio-postgres = { version = "0.7.12", features = ["with-chrono-0_4"] }
-serde_json = "1.0.128"
+axum = "0.8.3"
+tokio = { version = "1.44.1", features = ["full"] }
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
+serde = { version = "1.0.219", features = ["derive"] }
+deadpool-postgres = "0.14.1"
+tokio-postgres = { version = "0.7.13", features = ["with-chrono-0_4"] }
+serde_json = "1.0.140"
 futures-util = "0.3.31"
-chrono = "0.4.38"
+chrono = "0.4.40"
 arc-swap = "1.7.1"
-regex = "1.11.0"
+regex = "1.11.1"
 lazy_static = "1.5.0"
-rust_decimal =  { version = "1.36.0", features = ["db-tokio-postgres"] }
-utoipa = { features = ["axum_extras"], version = "5.1.1" }
+utoipa-axum = "0.2.0"
+rust_decimal =  { version = "1.37.1", features = ["db-tokio-postgres"] }
+utoipa = { features = ["axum_extras"], version = "5.3.1" }
 utoipa-swagger-ui = { features = ["axum"], version = "9.0.0" }
 zip = "=2.3.0"
