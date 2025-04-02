@@ -3,7 +3,7 @@ use axum::{
     extract::State,
     http::StatusCode,
     routing::{get, post},
-    Json, Router,
+    Json
 };
 use chrono::{DateTime, Utc, NaiveDate};
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
@@ -24,8 +24,11 @@ use std::{
 use tokio_postgres::{types::Oid, NoTls};
 use tracing::{debug, error, info, Level};
 use tracing_subscriber::FmtSubscriber;
-use utoipa::{OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
+use utoipa::{
+    openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
+    OpenApi,ToSchema
+};
 use utoipa_axum::router::OpenApiRouter;
 
 #[derive(OpenApi)]
@@ -46,7 +49,6 @@ use utoipa_axum::router::OpenApiRouter;
         crate::Data
     ))
 )]
-pub struct ApiDoc;
 
 pub struct Helper {
     tuple_structure: ArcSwap<HashMap<String, Vec<(String, String)>>>,
@@ -232,10 +234,10 @@ impl Helper {
         if STRNULL.eq(stringvalue) {
             return Some(stringvalue.to_string());
         } else if RE.is_match(&stringvalue) || stringvalue.len() < 1 {
-            if keep {
-                return Some(stringvalue.to_string());
+            return if keep {
+                Some(stringvalue.to_string())
             } else {
-                return Some(format!("'{}'", stringvalue.to_string()));
+                Some(format!("'{}'", stringvalue.to_string()))
             }
         }
         None
@@ -881,20 +883,22 @@ async fn main() -> core::result::Result<(), Box<dyn std::error::Error>> {
     }
 
     helper.refresh().await;
-    let app = Router::new()
-        .route("/", get(root))
+    let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi()).split_for_parts();
+    let router =
+    router.route("/", get(root))
         .route("/hosts", get(hosts))
         .route("/tables", post(tables))
         .route("/create", post(create))
         .route("/delete", post(delete))
         .route("/read", post(read))
         .route("/update", post(update))
-	.route("/openapi.json", get(openapi));
+	.route("/openapi.json", get(openapi))
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json",api.clone()))
         .with_state(Arc::new(helper));
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);
     let listener = TcpListener::bind(&addr).await?;
-    axum::serve(listener, app.into_make_service()).await.unwrap();
+    axum::serve(listener, router.into_make_service()).await.unwrap();
     info!("Shutting down");
     Ok(())
 }
