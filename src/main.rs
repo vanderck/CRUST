@@ -790,22 +790,6 @@ async fn delete(State(state): State<Arc<Helper>>, Json(payload): Json<Delete>) -
     }
 }
 
-#[derive(OpenApi)]
-#[openapi(paths(openapi))]
-struct ApiDoc;
-
-/// Return JSON version of an OpenAPI schema
-#[utoipa::path(
-    get,
-    path = "/openapi.json",
-    responses(
-        (status = 200, description = "JSON file", body = ())
-    )
-)]
-async fn openapi() -> Json<utoipa::openapi::OpenApi> {
-    Json(ApiDoc::openapi())
-}
-
 #[tokio::main]
 async fn main() -> core::result::Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
