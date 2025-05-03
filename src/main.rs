@@ -32,6 +32,11 @@ use utoipa::{
 
 #[derive(OpenApi)]
 #[openapi(
+    info(
+        title = "CRUST",
+        version = "1.0.0",
+        license(name = "MIT", identifier = "MIT")
+    ),
     paths(root, tables, hosts, update, read, create, delete),
     components(schemas(
         Host,
