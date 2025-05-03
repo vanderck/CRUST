@@ -3,7 +3,7 @@ use axum::{
     extract::State,
     http::StatusCode,
     routing::{get, post},
-    Json
+    Json, Router
 };
 use chrono::{DateTime, Utc, NaiveDate};
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
@@ -29,7 +29,6 @@ use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
     OpenApi,ToSchema
 };
-use utoipa_axum::router::OpenApiRouter;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -49,6 +48,7 @@ use utoipa_axum::router::OpenApiRouter;
         crate::Data
     ))
 )]
+pub struct ApiDoc;
 
 pub struct Helper {
     tuple_structure: ArcSwap<HashMap<String, Vec<(String, String)>>>,
@@ -883,19 +883,16 @@ async fn main() -> core::result::Result<(), Box<dyn std::error::Error>> {
     }
 
     helper.refresh().await;
-    let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi()).split_for_parts();
-    let router =
-    router.route("/", get(root))
+    let router = Router::new()
         .route("/hosts", get(hosts))
         .route("/tables", post(tables))
         .route("/create", post(create))
         .route("/delete", post(delete))
         .route("/read", post(read))
         .route("/update", post(update))
-	.route("/openapi.json", get(openapi))
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json",api.clone()))
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json",ApiDoc::openapi()))
         .with_state(Arc::new(helper));
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     tracing::debug!("listening on {}", addr);
     let listener = TcpListener::bind(&addr).await?;
     axum::serve(listener, router.into_make_service()).await.unwrap();
