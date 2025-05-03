@@ -35,7 +35,7 @@ use utoipa::{
     info(
         title = "CRUST",
         version = "1.0.0",
-        license(name = "MIT", identifier = "MIT")
+        license(name = "BSD", identifier = "BSD")
     ),
     paths(root, tables, hosts, update, read, create, delete),
     components(schemas(
