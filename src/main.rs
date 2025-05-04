@@ -35,22 +35,19 @@ use utoipa::{
     info(
         title = "CRUST",
         version = "1.0.0",
-        license(name = "BSD", identifier = "BSD")
+        license(name = "MIT", identifier = "MIT")
     ),
-    paths(root, tables, hosts, update, read, create, delete),
+    paths(root, columns, tables, hosts, update, read, create, delete),
     components(schemas(
-        Host,
-        crate::Path,
+        Tables,
         Create,
         Read,
         Delete,
         Update,
         Field,
-        crate::Data,
-        crate::Row,
-        crate::Hosts,
-        crate::Tables,
-        crate::Data
+        List,
+        crate::Path,
+        Data
     ))
 )]
 pub struct ApiDoc;
@@ -133,7 +130,6 @@ impl Helper {
             vec.push(combi);
         }
     }
-
     async fn refresh(&self) {
         if !self.can_refresh() {
             return;
@@ -167,7 +163,7 @@ impl Helper {
             JOIN pg_catalog.pg_namespace n ON ( n.oid = t.typnamespace ) 
             left outer join pg_catalog.pg_views v on n.nspname = v.schemaname and t.typname = v.viewname
             WHERE a.attnum > 0 and n.nspname not in ('pg_catalog', 'information_schema') 
-			 AND NOT a.attisdropped order by concat(n.nspname, '.', t.typname) asc",
+                         AND NOT a.attisdropped order by concat(n.nspname, '.', t.typname) asc",
 
              /* 
             let it = client.query_raw(
@@ -179,7 +175,7 @@ impl Helper {
             params
         ).await.unwrap();
             pin_mut!(it);
-            while let Some(row) = it.try_next().await.unwrap() {
+		            while let Some(row) = it.try_next().await.unwrap() {
                 let schema: String = row.get(0);
                 let table: String = row.get(1);
                 let column: String = row.get(2);
@@ -247,8 +243,7 @@ impl Helper {
         }
         None
     }
-
-    fn get_as_string(&self, field: &Field) -> Option<String> {
+	    fn get_as_string(&self, field: &Field) -> Option<String> {
         let rel;
         if field.relation.is_none() {
             rel = "=";
@@ -317,10 +312,6 @@ impl Default for Helper {
     }
 }
 #[derive(ToSchema, Serialize)]
-struct Hosts {
-    hosts: Vec<String>,
-}
-#[derive(ToSchema, Serialize)]
 struct Tables {
     tables: Vec<Path>,
 }
@@ -331,11 +322,6 @@ struct Create {
     path: Path,
     data: Vec<Field>,
 }
-#[derive(ToSchema, Deserialize)]
-struct Host {
-    name: String,
-}
-
 #[derive(Serialize, Deserialize, ToSchema)]
 struct Field {
     name: String,
@@ -375,12 +361,12 @@ struct Read {
 
 #[derive(ToSchema, Serialize)]
 struct Data {
-    rows: Vec<Row>,
+    rows: Vec<List>,
 }
 
 #[derive(ToSchema, Serialize)]
-struct Row {
-    row: Vec<String>,
+struct List {
+    list: Vec<String>,
 }
 
 #[utoipa::path(
@@ -399,42 +385,69 @@ async fn root(State(_state): State<Arc<Helper>>) -> &'static str {
     get,
     path = "/hosts",
     responses(
-        (status = 200, description = "Databases", body = Hosts)
+        (status = 200, description = "Databases", body = List)
     )
 )]
 
-async fn hosts(State(state): State<Arc<Helper>>) -> Json<Hosts> {
+async fn hosts(State(state): State<Arc<Helper>>) -> Json<List> {
     let vec = state.get_from_server_cache().await;
-    let foundhosts = Hosts { hosts: vec };
+    let foundhosts = List { list: vec };
     Json(foundhosts)
 }
 
 #[utoipa::path(
     post,
     path = "/tables",
+    request_body = String,
     responses(
         (status = 200, description = "Tables", body = Tables)
-    )
+    ),
 )]
 async fn tables(
     State(state): State<Arc<Helper>>,
-    Json(payload): Json<Host>,
-) -> (StatusCode, Json<Tables>) {
+    Json(payload): Json<String>,
+) -> Json<Tables> {
     let mut tables: Vec<Path> = vec![];
-    let vec_tables = state.get_from_cache(&payload.name).await;
+    let pl = &payload.clone();
+    let vec_tables = state.get_from_cache(pl).await;
     for table in vec_tables {
         tables.push(Path {
-            server: payload.name.to_string(),
+            server: pl.to_string(),
             schema: table.0,
             table: table.1,
         });
     }
     let tables = Tables { tables };
-    (StatusCode::FOUND, Json(tables))
+    Json(tables)
+}
+
+#[utoipa::path(
+    post,
+    path = "/columns",
+    request_body = Path,
+    responses(
+        (status = 200, description = "Columns", body = List)
+    )
+)]
+async fn columns(
+    State(state): State<Arc<Helper>>,
+    Json(payload): Json<Path>,
+) -> Json<List> {
+    let together = format!(
+        "{}.{}.{}",
+        payload.server, payload.schema, payload.table
+    );
+    let vec_columns = state.get_from_cache(&together).await;
+    let first_column: Vec<String> = vec_columns.iter()
+    .map(|(first, _)| first.clone())
+    .collect();
+    let columns = List { list: first_column };
+    Json(columns)
 }
 #[utoipa::path(
     post,
     path = "/create",
+    request_body = Create,
     responses(
         (status = 200, description = "Create")
     )
@@ -502,7 +515,7 @@ async fn create(State(state): State<Arc<Helper>>, Json(payload): Json<Create>) -
         }
         let rows = it.rows_affected();
         if rows.unwrap() == 1 {
-            StatusCode::OK
+		            StatusCode::OK
         } else {
             error!("{} failed", &together);
             StatusCode::NOT_ACCEPTABLE
@@ -513,6 +526,7 @@ async fn create(State(state): State<Arc<Helper>>, Json(payload): Json<Create>) -
 #[utoipa::path(
     post,
     path = "/read",
+    request_body = Read,
     responses(
         (status = 200, description = "Read", body = Data)
     )
@@ -522,7 +536,7 @@ async fn read(
     Json(payload): Json<Read>,
 ) -> (StatusCode, Json<Data>) {
     let page_size = payload.page_size.unwrap_or(10);
-    let mut data: Vec<Row> = Vec::new();
+    let mut data: Vec<List> = Vec::new();
     let mut together = format!(
         "{}.{}.{}",
         payload.path.server, payload.path.schema, payload.path.table
@@ -544,12 +558,12 @@ async fn read(
         for column in &vec_columns {
             values.push(column.0.to_string());
         }
-        data.push(Row { row: values });
+        data.push(List { list: values });
         let mut values: Vec<String> = Vec::new();
         for column in &vec_columns {
             values.push(column.1.to_string());
         }
-        data.push(Row { row: values });
+        data.push(List { list: values });
     } else {
         let m: HashMap<_, _> = vec_columns.into_iter().collect();
         let mut together = format!("select ");
@@ -572,7 +586,7 @@ async fn read(
             }
         }
         let where_clause = state.where_clause(m, payload.r#where).await;
-        if where_clause.is_none() {
+	        if where_clause.is_none() {
             return (StatusCode::NOT_FOUND, Json(Data { rows: data }));
         }
         together = together
@@ -592,6 +606,7 @@ async fn read(
         let params: Vec<String> = vec![];
         let res = client.query_raw(&together, params).await;
         if res.is_err() {
+            info!("Not found");
             return (StatusCode::NOT_FOUND, Json(Data { rows: data }));
         }
         let it = res.unwrap();
@@ -642,7 +657,7 @@ async fn read(
                     if val.is_some() {
                         values.push(val.unwrap().to_string())
                     } else {
-                        values.push(STRNULL.to_string());
+			                            values.push(STRNULL.to_string());
                     }
                 } else if coltype.eq("timestamptz") || coltype.eq("timestamp") {
                     let val: Option<SystemTime> = row.get(col_index);
@@ -665,7 +680,7 @@ async fn read(
                     error!("{}", column.type_());
                 }
             }
-            data.push(Row { row: values });
+            data.push(List { list: values });
         }
     }
     (StatusCode::OK, Json(Data { rows: data }))
@@ -674,6 +689,7 @@ async fn read(
 #[utoipa::path(
     post,
     path = "/update",
+    request_body = Update,
     responses(
         (status = 200, description = "Update")
     )
@@ -713,7 +729,7 @@ async fn update(State(state): State<Arc<Helper>>, Json(payload): Json<Update>) -
         }
         let where_clause = state.where_clause(m, payload.r#where).await;
         if where_clause.is_none() {
-            return StatusCode::NOT_FOUND;
+		            return StatusCode::NOT_FOUND;
         }
         let backup_together = format!(
             "{}.{}.{}_history",
@@ -749,6 +765,7 @@ select item_id, name, item_group from {}.{} where item_id=2",
 #[utoipa::path(
     post,
     path = "/delete",
+    request_body = Delete,
     responses(
         (status = 200, description = "Delete")
     )
@@ -784,7 +801,7 @@ async fn delete(State(state): State<Arc<Helper>>, Json(payload): Json<Delete>) -
         pin_mut!(it);
         //let orow = it.try_next().await;
         let rows = it.rows_affected();
-        if rows.is_none() {
+	        if rows.is_none() {
             return StatusCode::NOT_MODIFIED;
         } else if rows.unwrap() == 1 {
             StatusCode::OK
@@ -875,6 +892,7 @@ async fn main() -> core::result::Result<(), Box<dyn std::error::Error>> {
     let router = Router::new()
         .route("/hosts", get(hosts))
         .route("/tables", post(tables))
+        .route("/columns", post(columns))
         .route("/create", post(create))
         .route("/delete", post(delete))
         .route("/read", post(read))
